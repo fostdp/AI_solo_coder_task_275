@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>驻波管实验模拟 - 专业版</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>驻波管实验模拟</h1>
+        <p class="subtitle">专业声学实验平台 - 支持多种管型和介质</p>
+        
+        <div class="canvas-container">
+            <canvas id="waveCanvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>管类型</label>
+                <select id="tubeType">
+                    <option value="oneEndOpen">一端封闭一端开口</option>
+                    <option value="bothEndsOpen">两端开口</option>
+                    <option value="bothEndsClosed">两端封闭</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>介质类型</label>
+                <select id="mediumType">
+                    <option value="air">空气 (343 m/s)</option>
+                    <option value="water">水 (1480 m/s)</option>
+                    <option value="steel">钢铁 (5000 m/s)</option>
+                    <option value="glass">玻璃 (4540 m/s)</option>
+                    <option value="custom">自定义...</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="customSpeedGroup" style="display: none;">
+                <label for="customSpeed">自定义声速 (m/s)</label>
+                <input type="number" id="customSpeed" min="100" max="10000" value="343" step="1">
+            </div>
+            
+            <div class="control-group">
+                <label for="frequencySlider">频率: <span id="frequencyValue">100</span> Hz</label>
+                <input type="range" id="frequencySlider" min="20" max="5000" value="100" step="1">
+            </div>
+            
+            <div class="control-group">
+                <label for="tubeLengthSlider">管长: <span id="tubeLengthValue">1.0</span> m</label>
+                <input type="range" id="tubeLengthSlider" min="0.1" max="10" value="1" step="0.1">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showMolecules"> 显示分子振动
+                </label>
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    <input type="checkbox" id="showFrequencyResponse"> 显示频响曲线
+                </label>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="label">谐波次数:</span>
+                <span id="harmonic" class="value">1</span>
+            </div>
+            <div class="info-item">
+                <span class="label">当前波长:</span>
+                <span id="wavelength" class="value">3.43</span> m
+            </div>
+            <div class="info-item">
+                <span class="label">声速:</span>
+                <span id="waveSpeed" class="value">343</span> m/s
+            </div>
+            <div class="info-item">
+                <span class="label">基频 (f₀):</span>
+                <span id="fundamentalFreq" class="value">85.75</span> Hz
+            </div>
+            <div class="info-item">
+                <span class="label">共振频率:</span>
+                <span id="resonantFreq" class="value">85.75</span> Hz
+            </div>
+            <div class="info-item">
+                <span class="label">波腹位置:</span>
+                <span id="antinodes" class="value">开口端</span>
+            </div>
+            <div class="info-item">
+                <span class="label">波节位置:</span>
+                <span id="nodes" class="value">封闭端</span>
+            </div>
+        </div>
+        
+        <div class="resonant-frequencies">
+            <h3>共振频率列表</h3>
+            <div id="resonantList"></div>
+        </div>
+        
+        <div class="frequency-response" id="frequencyResponsePanel" style="display: none;">
+            <h3>频率响应曲线</h3>
+            <canvas id="responseCanvas"></canvas>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="color-box high-pressure"></div>
+                <span>高声压</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box medium-pressure"></div>
+                <span>中声压</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box low-pressure"></div>
+                <span>低声压</span>
+            </div>
+            <div class="legend-item">
+                <div class="color-box displacement-wave"></div>
+                <span>位移波</span>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="saveBtn" class="btn">保存实验数据</button>
+            <button id="screenshotBtn" class="btn btn-secondary">导出截图</button>
+            <button id="exportCsvBtn" class="btn btn-secondary">导出CSV</button>
+            <button id="exportJsonBtn" class="btn btn-secondary">导出JSON</button>
+            <button id="resetBtn" class="btn btn-danger">重置</button>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

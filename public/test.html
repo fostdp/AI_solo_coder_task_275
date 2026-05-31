@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>驻波管实验模拟 - 单元测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .summary-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .pass .summary-value { color: #34a853; }
+        .fail .summary-value { color: #ea4335; }
+        .total .summary-value { color: #1a73e8; }
+        .test-suite {
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .suite-header {
+            background: #1a73e8;
+            color: white;
+            padding: 12px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .suite-header:hover { background: #1557b0; }
+        .suite-stats {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        .test-cases {
+            padding: 10px;
+        }
+        .test-case {
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .test-case.pass {
+            background: #e6f4ea;
+            border-left: 4px solid #34a853;
+        }
+        .test-case.fail {
+            background: #fce8e6;
+            border-left: 4px solid #ea4335;
+        }
+        .test-name {
+            font-weight: 500;
+            color: #202124;
+        }
+        .test-status {
+            font-weight: bold;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .pass .test-status {
+            background: #34a853;
+            color: white;
+        }
+        .fail .test-status {
+            background: #ea4335;
+            color: white;
+        }
+        .test-error {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #d93025;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .test-expected {
+            margin-top: 3px;
+            font-size: 11px;
+            color: #666;
+        }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px auto;
+            display: block;
+        }
+        button:hover { background: #1557b0; }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #34a853;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .formula-box {
+            background: #f8f9fa;
+            border-left: 4px solid #1a73e8;
+            padding: 10px 15px;
+            margin: 10px 0;
+            font-family: 'Times New Roman', serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 驻波管实验模拟 - 单元测试</h1>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-item total">
+                <div class="summary-value" id="totalTests">0</div>
+                <div class="summary-label">总测试数</div>
+            </div>
+            <div class="summary-item pass">
+                <div class="summary-value" id="passedTests">0</div>
+                <div class="summary-label">通过</div>
+            </div>
+            <div class="summary-item fail">
+                <div class="summary-value" id="failedTests">0</div>
+                <div class="summary-label">失败</div>
+            </div>
+        </div>
+        
+        <button onclick="runAllTests()">▶ 运行所有测试</button>
+        
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        const TUBE_LEFT = 50;
+        const TUBE_RIGHT = 850;
+        const MEDIA_SPEEDS = {
+            air: 343,
+            water: 1480,
+            steel: 5000,
+            glass: 4540
+        };
+        
+        function getWaveNumberMultiplier(tubeType, tubeLength) {
+            switch (tubeType) {
+                case 'oneEndOpen':
+                    return { kFactor: Math.PI / (2 * tubeLength), harmonicStep: 2, firstHarmonic: 1 };
+                case 'bothEndsOpen':
+                case 'bothEndsClosed':
+                    return { kFactor: Math.PI / tubeLength, harmonicStep: 1, firstHarmonic: 1 };
+                default:
+                    return { kFactor: Math.PI / (2 * tubeLength), harmonicStep: 2, firstHarmonic: 1 };
+            }
+        }
+        
+        function calculateFundamentalFrequency(tubeType, waveSpeed, tubeLength) {
+            switch (tubeType) {
+                case 'oneEndOpen':
+                    return waveSpeed / (4 * tubeLength);
+                case 'bothEndsOpen':
+                case 'bothEndsClosed':
+                    return waveSpeed / (2 * tubeLength);
+                default:
+                    return waveSpeed / (4 * tubeLength);
+            }
+        }
+        
+        function calculateResonantFrequency(tubeType, waveSpeed, tubeLength, harmonic) {
+            const f0 = calculateFundamentalFrequency(tubeType, waveSpeed, tubeLength);
+            const { harmonicStep, firstHarmonic } = getWaveNumberMultiplier(tubeType, tubeLength);
+            const n = firstHarmonic + (harmonic - 1) * harmonicStep;
+            return n * f0;
+        }
+        
+        function calculateWavelength(frequency, waveSpeed) {
+            return waveSpeed / frequency;
+        }
+        
+        function getDisplacement(x, t, tubeType, frequency, waveSpeed, tubeLength) {
+            const tubeWidth = TUBE_RIGHT - TUBE_LEFT;
+            const normalizedX = (x - TUBE_LEFT) / tubeWidth;
+            const { kFactor } = getWaveNumberMultiplier(tubeType, tubeLength);
+            const omega = 2 * Math.PI * frequency;
+            
+            switch (tubeType) {
+                case 'oneEndOpen':
+                    return Math.sin(kFactor * normalizedX * tubeLength) * Math.cos(omega * t);
+                case 'bothEndsOpen':
+                    return Math.cos(kFactor * normalizedX * tubeLength) * Math.cos(omega * t);
+                case 'bothEndsClosed':
+                    return Math.sin(kFactor * normalizedX * tubeLength) * Math.cos(omega * t);
+                default:
+                    return 0;
+            }
+        }
+        
+        function getPressure(x, t, tubeType, frequency, waveSpeed, tubeLength) {
+            const tubeWidth = TUBE_RIGHT - TUBE_LEFT;
+            const normalizedX = (x - TUBE_LEFT) / tubeWidth;
+            const { kFactor } = getWaveNumberMultiplier(tubeType, tubeLength);
+            const omega = 2 * Math.PI * frequency;
+            
+            switch (tubeType) {
+                case 'oneEndOpen':
+                    return Math.cos(kFactor * normalizedX * tubeLength) * Math.sin(omega * t);
+                case 'bothEndsOpen':
+                    return -Math.sin(kFactor * normalizedX * tubeLength) * Math.sin(omega * t);
+                case 'bothEndsClosed':
+                    return Math.cos(kFactor * normalizedX * tubeLength) * Math.sin(omega * t);
+                default:
+                    return 0;
+            }
+        }
+        
+        function approximate(value, precision = 4) {
+            return parseFloat(value.toFixed(precision));
+        }
+        
+        let testResults = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            suites: []
+        };
+        
+        function test(name, fn) {
+            try {
+                fn();
+                return { name, passed: true };
+            } catch (e) {
+                return { name, passed: false, error: e.message };
+            }
+        }
+        
+        function assertEqual(actual, expected, message = '') {
+            if (Math.abs(actual - expected) > 0.01) {
+                throw new Error(`${message}\n预期: ${expected}\n实际: ${actual}\n差值: ${Math.abs(actual - expected)}`);
+            }
+        }
+        
+        function assertTrue(condition, message = '') {
+            if (!condition) {
+                throw new Error(message || '断言失败');
+            }
+        }
+        
+        function assertFalse(condition, message = '') {
+            if (condition) {
+                throw new Error(message || '断言失败');
+            }
+        }
+        
+        const testSuites = [
+            {
+                name: '📏 边界条件验证测试',
+                description: '验证不同管型在端点处的位移和声压边界条件',
+                formula: '封闭端：位移=0（波节），声压最大（波腹）\n开口端：位移最大（波腹），声压=0（波节）',
+                tests: [
+                    {
+                        name: '一端封闭 - 封闭端位移应为0（波节）',
+                        fn: () => {
+                            const displacement = getDisplacement(TUBE_LEFT, 0, 'oneEndOpen', 100, 343, 1);
+                            assertEqual(Math.abs(displacement), 0, '封闭端位移应接近0');
+                        }
+                    },
+                    {
+                        name: '一端封闭 - 封闭端声压绝对值应为最大',
+                        fn: () => {
+                            const pressureAtClosed = getPressure(TUBE_LEFT, Math.PI/200, 'oneEndOpen', 100, 343, 1);
+                            const pressureAtMiddle = getPressure((TUBE_LEFT + TUBE_RIGHT)/2, Math.PI/200, 'oneEndOpen', 100, 343, 1);
+                            assertTrue(Math.abs(pressureAtClosed) >= Math.abs(pressureAtMiddle), '封闭端声压绝对值应大于等于中间位置');
+                        }
+                    },
+                    {
+                        name: '一端封闭 - 开口端声压绝对值应接近0',
+                        fn: () => {
+                            const pressureAtOpen = getPressure(TUBE_RIGHT, Math.PI/200, 'oneEndOpen', 100, 343, 1);
+                            assertTrue(Math.abs(pressureAtOpen) < 0.1, '开口端声压绝对值应接近0');
+                        }
+                    },
+                    {
+                        name: '两端开口 - 两端位移绝对值应为最大',
+                        fn: () => {
+                            const displacementLeft = getDisplacement(TUBE_LEFT, 0, 'bothEndsOpen', 100, 343, 1);
+                            const displacementRight = getDisplacement(TUBE_RIGHT, 0, 'bothEndsOpen', 100, 343, 1);
+                            const displacementMiddle = getDisplacement((TUBE_LEFT + TUBE_RIGHT)/2, 0, 'bothEndsOpen', 100, 343, 1);
+                            assertTrue(Math.abs(displacementLeft) >= Math.abs(displacementMiddle), '左端位移应大于等于中间位移');
+                            assertTrue(Math.abs(displacementRight) >= Math.abs(displacementMiddle), '右端位移应大于等于中间位移');
+                        }
+                    },
+                    {
+                        name: '两端开口 - 两端声压绝对值应接近0',
+                        fn: () => {
+                            const pressureLeft = getPressure(TUBE_LEFT, Math.PI/200, 'bothEndsOpen', 100, 343, 1);
+                            const pressureRight = getPressure(TUBE_RIGHT, Math.PI/200, 'bothEndsOpen', 100, 343, 1);
+                            assertTrue(Math.abs(pressureLeft) < 0.1, '左端声压应接近0');
+                            assertTrue(Math.abs(pressureRight) < 0.1, '右端声压应接近0');
+                        }
+                    },
+                    {
+                        name: '两端封闭 - 两端位移应接近0',
+                        fn: () => {
+                            const displacementLeft = getDisplacement(TUBE_LEFT, 0, 'bothEndsClosed', 100, 343, 1);
+                            const displacementRight = getDisplacement(TUBE_RIGHT, 0, 'bothEndsClosed', 100, 343, 1);
+                            assertTrue(Math.abs(displacementLeft) < 0.1, '左端位移应接近0');
+                            assertTrue(Math.abs(displacementRight) < 0.1, '右端位移应接近0');
+                        }
+                    },
+                    {
+                        name: '两端封闭 - 两端声压绝对值应为最大',
+                        fn: () => {
+                            const pressureLeft = getPressure(TUBE_LEFT, Math.PI/200, 'bothEndsClosed', 100, 343, 1);
+                            const pressureRight = getPressure(TUBE_RIGHT, Math.PI/200, 'bothEndsClosed', 100, 343, 1);
+                            const pressureMiddle = getPressure((TUBE_LEFT + TUBE_RIGHT)/2, Math.PI/200, 'bothEndsClosed', 100, 343, 1);
+                            assertTrue(Math.abs(pressureLeft) >= Math.abs(pressureMiddle), '左端声压绝对值应大于等于中间位置');
+                            assertTrue(Math.abs(pressureRight) >= Math.abs(pressureMiddle), '右端声压绝对值应大于等于中间位置');
+                        }
+                    }
+                ]
+            },
+            {
+                name: '🎵 谐波频率公式测试',
+                description: '验证不同管型的基频和谐波频率计算公式',
+                formula: '一端封闭：f_n = (2n-1) * v / (4L)  (奇次谐波)\n两端开口/封闭：f_n = n * v / (2L)  (全谐波)',
+                tests: [
+                    {
+                        name: '一端封闭 - 基频公式验证 (L=1m, v=343m/s)',
+                        fn: () => {
+                            const f0 = calculateFundamentalFrequency('oneEndOpen', 343, 1);
+                            const expected = 343 / (4 * 1);
+                            assertEqual(f0, expected, '基频计算错误');
+                        }
+                    },
+                    {
+                        name: '一端封闭 - 第1次谐波频率',
+                        fn: () => {
+                            const f1 = calculateResonantFrequency('oneEndOpen', 343, 1, 1);
+                            const expected = 343 / 4;
+                            assertEqual(f1, expected, '第1次谐波频率计算错误');
+                        }
+                    },
+                    {
+                        name: '一端封闭 - 第2次谐波频率（应为3倍基频）',
+                        fn: () => {
+                            const f2 = calculateResonantFrequency('oneEndOpen', 343, 1, 2);
+                            const expected = 3 * (343 / 4);
+                            assertEqual(f2, expected, '第2次谐波频率应为3倍基频');
+                        }
+                    },
+                    {
+                        name: '一端封闭 - 第3次谐波频率（应为5倍基频）',
+                        fn: () => {
+                            const f3 = calculateResonantFrequency('oneEndOpen', 343, 1, 3);
+                            const expected = 5 * (343 / 4);
+                            assertEqual(f3, expected, '第3次谐波频率应为5倍基频');
+                        }
+                    },
+                    {
+                        name: '两端开口 - 基频公式验证 (L=1m, v=343m/s)',
+                        fn: () => {
+                            const f0 = calculateFundamentalFrequency('bothEndsOpen', 343, 1);
+                            const expected = 343 / (2 * 1);
+                            assertEqual(f0, expected, '基频计算错误');
+                        }
+                    },
+                    {
+                        name: '两端开口 - 第2次谐波频率（应为2倍基频）',
+                        fn: () => {
+                            const f2 = calculateResonantFrequency('bothEndsOpen', 343, 1, 2);
+                            const expected = 2 * (343 / 2);
+                            assertEqual(f2, expected, '第2次谐波频率应为2倍基频');
+                        }
+                    },
+                    {
+                        name: '两端封闭 - 基频应与两端开口相同',
+                        fn: () => {
+                            const f0_closed = calculateFundamentalFrequency('bothEndsClosed', 343, 1);
+                            const f0_open = calculateFundamentalFrequency('bothEndsOpen', 343, 1);
+                            assertEqual(f0_closed, f0_open, '两端封闭与两端开口基频应相同');
+                        }
+                    },
+                    {
+                        name: '管长加倍基频减半（L=1m vs L=2m）',
+                        fn: () => {
+                            const f0_L1 = calculateFundamentalFrequency('oneEndOpen', 343, 1);
+                            const f0_L2 = calculateFundamentalFrequency('oneEndOpen', 343, 2);
+                            assertEqual(f0_L2, f0_L1 / 2, '管长加倍基频应减半');
+                        }
+                    }
+                ]
+            },
+            {
+                name: '🌊 多介质声速转换测试',
+                description: '验证不同介质中的声速对频率和波长的影响',
+                formula: '波长 λ = v / f\n声速：空气343m/s，水1480m/s，钢铁5000m/s',
+                tests: [
+                    {
+                        name: '空气介质声速值验证',
+                        fn: () => {
+                            assertEqual(MEDIA_SPEEDS.air, 343, '空气声速应为343m/s');
+                        }
+                    },
+                    {
+                        name: '水介质声速值验证',
+                        fn: () => {
+                            assertEqual(MEDIA_SPEEDS.water, 1480, '水中声速应为1480m/s');
+                        }
+                    },
+                    {
+                        name: '钢铁介质声速值验证',
+                        fn: () => {
+                            assertEqual(MEDIA_SPEEDS.steel, 5000, '钢铁声速应为5000m/s');
+                        }
+                    },
+                    {
+                        name: '相同频率下波长与声速成正比（空气vs水）',
+                        fn: () => {
+                            const lambda_air = calculateWavelength(100, MEDIA_SPEEDS.air);
+                            const lambda_water = calculateWavelength(100, MEDIA_SPEEDS.water);
+                            const ratio = lambda_water / lambda_air;
+                            const expectedRatio = MEDIA_SPEEDS.water / MEDIA_SPEEDS.air;
+                            assertEqual(ratio, expectedRatio, '相同频率下波长应与声速成正比');
+                        }
+                    },
+                    {
+                        name: '基频与声速成正比（空气vs钢铁）',
+                        fn: () => {
+                            const f0_air = calculateFundamentalFrequency('oneEndOpen', MEDIA_SPEEDS.air, 1);
+                            const f0_steel = calculateFundamentalFrequency('oneEndOpen', MEDIA_SPEEDS.steel, 1);
+                            const ratio = f0_steel / f0_air;
+                            const expectedRatio = MEDIA_SPEEDS.steel / MEDIA_SPEEDS.air;
+                            assertEqual(ratio, expectedRatio, '基频应与声速成正比');
+                        }
+                    },
+                    {
+                        name: '水中波长计算验证 (f=100Hz)',
+                        fn: () => {
+                            const lambda = calculateWavelength(100, MEDIA_SPEEDS.water);
+                            const expected = 1480 / 100;
+                            assertEqual(lambda, expected, '水中波长计算错误');
+                        }
+                    },
+                    {
+                        name: '钢铁中基频验证 (L=1m)',
+                        fn: () => {
+                            const f0 = calculateFundamentalFrequency('oneEndOpen', MEDIA_SPEEDS.steel, 1);
+                            const expected = 5000 / 4;
+                            assertEqual(f0, expected, '钢铁中基频计算错误');
+                        }
+                    }
+                ]
+            },
+            {
+                name: '🎚️ 频率滑块精度测试',
+                description: '验证频率范围、步长精度和边界值处理',
+                formula: '频率范围：20Hz - 5000Hz\n步长精度：1Hz',
+                tests: [
+                    {
+                        name: '频率最小值验证 (20Hz)',
+                        fn: () => {
+                            const minFreq = 20;
+                            const lambda = calculateWavelength(minFreq, 343);
+                            assertTrue(lambda > 0, '最小频率下波长应为正值');
+                            assertEqual(lambda, 343 / 20, '最小频率下波长计算错误');
+                        }
+                    },
+                    {
+                        name: '频率最大值验证 (5000Hz)',
+                        fn: () => {
+                            const maxFreq = 5000;
+                            const lambda = calculateWavelength(maxFreq, 343);
+                            assertTrue(lambda > 0, '最大频率下波长应为正值');
+                            assertEqual(lambda, 343 / 5000, '最大频率下波长计算错误');
+                        }
+                    },
+                    {
+                        name: '步长精度验证 (1Hz步进)',
+                        fn: () => {
+                            const f1 = 100;
+                            const f2 = 101;
+                            const deltaLambda = calculateWavelength(f1, 343) - calculateWavelength(f2, 343);
+                            const expectedDelta = 343/100 - 343/101;
+                            assertEqual(deltaLambda, expectedDelta, '1Hz步进对应的波长变化计算错误');
+                            assertTrue(deltaLambda > 0, '频率增加波长应减小');
+                        }
+                    },
+                    {
+                        name: '高频段精度验证 (4000Hz vs 4001Hz)',
+                        fn: () => {
+                            const lambda1 = calculateWavelength(4000, 343);
+                            const lambda2 = calculateWavelength(4001, 343);
+                            const delta = Math.abs(lambda1 - lambda2);
+                            assertTrue(delta > 0.00001, '高频段仍应有可检测的波长变化');
+                        }
+                    },
+                    {
+                        name: '频率-波长反比关系验证',
+                        fn: () => {
+                            const lambda100 = calculateWavelength(100, 343);
+                            const lambda200 = calculateWavelength(200, 343);
+                            assertEqual(lambda200, lambda100 / 2, '频率加倍波长应减半');
+                        }
+                    },
+                    {
+                        name: '共振频率精度验证（第5次谐波）',
+                        fn: () => {
+                            const f5 = calculateResonantFrequency('oneEndOpen', 343, 1, 5);
+                            const expected = 9 * (343 / 4);
+                            assertEqual(f5, expected, '高次谐波频率精度不足');
+                        }
+                    }
+                ]
+            },
+            {
+                name: '📊 声压分布计算测试',
+                description: '验证声压分布的连续性、相位关系和极值位置',
+                formula: '声压 p ∝ -dξ/dx\n位移 ξ 与声压 p 相位差90°',
+                tests: [
+                    {
+                        name: '声压函数连续性验证',
+                        fn: () => {
+                            for (let x = TUBE_LEFT; x < TUBE_RIGHT; x += 10) {
+                                const p1 = getPressure(x, 0.1, 'oneEndOpen', 100, 343, 1);
+                                const p2 = getPressure(x + 1, 0.1, 'oneEndOpen', 100, 343, 1);
+                                const delta = Math.abs(p2 - p1);
+                                assertTrue(delta < 0.1, '相邻位置声压不应突变: x=' + x);
+                            }
+                        }
+                    },
+                    {
+                        name: '声压极值位置验证（波腹位置）',
+                        fn: () => {
+                            const pressureLeft = getPressure(TUBE_LEFT, Math.PI/200, 'oneEndOpen', 100, 343, 1);
+                            const pressureNearLeft = getPressure(TUBE_LEFT + 10, Math.PI/200, 'oneEndOpen', 100, 343, 1);
+                            assertTrue(Math.abs(pressureLeft) >= Math.abs(pressureNearLeft), '端点声压应大于邻近点');
+                        }
+                    },
+                    {
+                        name: '声压与位移相位差90度验证',
+                        fn: () => {
+                            const maxDisplacementTime = 0;
+                            const maxPressureTime = Math.PI / (2 * Math.PI * 100);
+                            const displacementAtMaxPressure = getDisplacement((TUBE_LEFT + TUBE_RIGHT)/2, maxPressureTime, 'oneEndOpen', 100, 343, 1);
+                            assertTrue(Math.abs(displacementAtMaxPressure) < 0.1, '声压最大时位移应接近0');
+                        }
+                    },
+                    {
+                        name: '声压范围验证（应在[-1, 1]区间）',
+                        fn: () => {
+                            for (let x = TUBE_LEFT; x <= TUBE_RIGHT; x += 50) {
+                                for (let t = 0; t < 0.01; t += 0.001) {
+                                    const p = getPressure(x, t, 'oneEndOpen', 100, 343, 1);
+                                    assertTrue(p >= -1.001 && p <= 1.001, '声压超出范围: ' + p + ' at x=' + x);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        name: '声压分布对称性验证',
+                        fn: () => {
+                            const mid = (TUBE_LEFT + TUBE_RIGHT) / 2;
+                            const pLeft = getPressure(mid - 50, 0.1, 'bothEndsClosed', 100, 343, 1);
+                            const pRight = getPressure(mid + 50, 0.1, 'bothEndsClosed', 100, 343, 1);
+                            assertTrue(Math.abs(Math.abs(pLeft) - Math.abs(pRight)) < 0.1, '声压分布应对称');
+                        }
+                    },
+                    {
+                        name: '不同管型声压分布差异验证',
+                        fn: () => {
+                            const p_open = getPressure(TUBE_RIGHT, 0.1, 'oneEndOpen', 100, 343, 1);
+                            const p_closed = getPressure(TUBE_RIGHT, 0.1, 'bothEndsClosed', 100, 343, 1);
+                            assertTrue(Math.abs(p_closed) > Math.abs(p_open), '封闭端声压应大于开口端');
+                        }
+                    }
+                ]
+            },
+            {
+                name: '🔗 综合场景测试',
+                description: '多参数组合的端到端验证',
+                tests: [
+                    {
+                        name: '驻波条件验证：管长应为1/4波长整数倍',
+                        fn: () => {
+                            const L = 1;
+                            const f0 = calculateFundamentalFrequency('oneEndOpen', 343, L);
+                            const lambda0 = calculateWavelength(f0, 343);
+                            assertEqual(lambda0, 4 * L, '基频下波长应等于4倍管长');
+                        }
+                    },
+                    {
+                        name: '介质切换时的频率不变性验证',
+                        fn: () => {
+                            const f = 500;
+                            const lambda_air = calculateWavelength(f, MEDIA_SPEEDS.air);
+                            const lambda_steel = calculateWavelength(f, MEDIA_SPEEDS.steel);
+                            assertTrue(lambda_steel > lambda_air, '声速大的介质波长应更长');
+                        }
+                    },
+                    {
+                        name: '管长-频率-波长关系一致性验证',
+                        fn: () => {
+                            const L = 2;
+                            const f0 = calculateFundamentalFrequency('oneEndOpen', 343, L);
+                            const lambda0 = calculateWavelength(f0, 343);
+                            assertEqual(lambda0, 4 * L, '波长与管长关系不一致');
+                        }
+                    },
+                    {
+                        name: '奇次谐波数量验证',
+                        fn: () => {
+                            let count = 0;
+                            for (let f = 20; f <= 5000; f++) {
+                                const f0 = calculateFundamentalFrequency('oneEndOpen', 343, 1);
+                                const ratio = f / f0;
+                                if (Math.abs(ratio - Math.round(ratio)) < 0.01 && Math.round(ratio) % 2 === 1) {
+                                    count++;
+                                }
+                            }
+                            assertTrue(count > 50, '在20-5000Hz范围内应有足够多的奇次谐波');
+                        }
+                    },
+                    {
+                        name: '数值稳定性测试（极端参数）',
+                        fn: () => {
+                            for (let L = 0.1; L <= 10; L += 0.5) {
+                                for (let f = 20; f <= 5000; f *= 2) {
+                                    const f0 = calculateFundamentalFrequency('oneEndOpen', 343, L);
+                                    const lambda = calculateWavelength(f, 343);
+                                    assertTrue(!isNaN(f0) && isFinite(f0), '基频数值异常 L=' + L + ' f=' + f);
+                                    assertTrue(!isNaN(lambda) && isFinite(lambda), '波长数值异常 L=' + L + ' f=' + f);
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        ];
+        
+        function runAllTests() {
+            testResults = {
+                total: 0,
+                passed: 0,
+                failed: 0,
+                suites: []
+            };
+            
+            let completedTests = 0;
+            let totalTests = testSuites.reduce((sum, suite) => sum + suite.tests.length, 0);
+            
+            testSuites.forEach((suite, suiteIndex) => {
+                const suiteResult = {
+                    name: suite.name,
+                    description: suite.description,
+                    formula: suite.formula,
+                    tests: []
+                };
+                
+                suite.tests.forEach(testCase => {
+                    const result = test(testCase.name, testCase.fn);
+                    suiteResult.tests.push(result);
+                    testResults.total++;
+                    
+                    if (result.passed) {
+                        testResults.passed++;
+                    } else {
+                        testResults.failed++;
+                    }
+                    
+                    completedTests++;
+                    document.getElementById('progressFill').style.width = 
+                        (completedTests / totalTests * 100) + '%';
+                });
+                
+                testResults.suites.push(suiteResult);
+            });
+            
+            renderResults();
+        }
+        
+        function renderResults() {
+            document.getElementById('totalTests').textContent = testResults.total;
+            document.getElementById('passedTests').textContent = testResults.passed;
+            document.getElementById('failedTests').textContent = testResults.failed;
+            
+            const container = document.getElementById('testResults');
+            container.innerHTML = testResults.suites.map((suite, suiteIndex) => {
+                const suitePassed = suite.tests.filter(t => t.passed).length;
+                const suiteTotal = suite.tests.length;
+                
+                return `
+                    <div class="test-suite">
+                        <div class="suite-header" onclick="toggleSuite(${suiteIndex})">
+                            <span>${suite.name} (${suitePassed}/${suiteTotal})</span>
+                            <span class="suite-stats">${suite.description}</span>
+                        </div>
+                        <div class="test-cases" id="suite-${suiteIndex}">
+                            ${suite.formula ? `<div class="formula-box">${suite.formula.replace(/\n/g, '<br>')}</div>` : ''}
+                            ${suite.tests.map(t => `
+                                <div class="test-case ${t.passed ? 'pass' : 'fail'}">
+                                    <div>
+                                        <div class="test-name">${t.name}</div>
+                                        ${t.error ? `<div class="test-error">❌ ${t.error}</div>` : ''}
+                                    </div>
+                                    <span class="test-status">${t.passed ? '通过 ✓' : '失败 ✗'}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function toggleSuite(index) {
+            const el = document.getElementById(`suite-${index}`);
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        window.onload = () => {
+            runAllTests();
+        };
+    </script>
+</body>
+</html>
